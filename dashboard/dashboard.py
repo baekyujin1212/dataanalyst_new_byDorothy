@@ -1,3 +1,5 @@
+import os
+import zipfile
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -6,35 +8,53 @@ import seaborn as sns
 # Set pengaturan dasar visualisasi
 sns.set_theme(style="whitegrid")
 
-# 1. LOAD DATA
+# 1. LOAD DATA (DIPERBAIKI: Membaca langsung dari file .zip)
 @st.cache_data
 def load_data():
-    # Membaca file main_data.csv yang ada di folder Colab kamu yg Mengarah langsung ke file ZIP di dalam folder dashboard GitHub
-    data = pd.read_csv("main_data.zip")
+    # Mendapatkan jalur folder tempat dashboard.py ini berada
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    
+    # Menentukan nama file ZIP kamu di GitHub (pastikan namanya main_data.zip)
+    zip_path = os.path.join(current_dir, "main_data.zip") 
+    
+    # Membaca CSV langsung dari dalam ZIP tanpa ekstraksi manual
+    with zipfile.ZipFile(zip_path, 'r') as z:
+        # Mencari nama file csv di dalam zip secara otomatis
+        csv_filename = [f for f in z.namelist() if f.endswith('.csv')][0]
+        with z.open(csv_filename) as f:
+            data = pd.read_csv(f)
+            
+    # Membuat kolom datetime terintegrasi
     data['datetime'] = pd.to_datetime(data['year'].astype(str) + '-' + 
                                        data['month'].astype(str).str.zfill(2) + '-' + 
                                        data['day'].astype(str).str.zfill(2))
     return data
 
+# Memanggil fungsi load data
 df = load_data()
 
 # 2. SIDEBAR / FILTER
 st.sidebar.image("https://images.unsplash.com/photo-1580137189272-c9379f8864fd?auto=format&fit=crop&w=300&q=80")
 st.sidebar.title("Filter Analisis")
 
+# Menyiapkan list untuk drop-down filter
 station_list = sorted(df['station'].unique())
 selected_station = st.sidebar.selectbox("Pilih Stasiun Pengamatan:", station_list)
 
 year_list = sorted(df['year'].unique())
 selected_year = st.sidebar.selectbox("Pilih Tahun Analisis:", year_list)
 
+# Memfilter data berdasarkan pilihan user
 filtered_df = df[(df['station'] == selected_station) & (df['year'] == selected_year)]
+
 
 # 3. MAIN PAGE HEADER
 st.title("🌦️ Dashboard Kualitas Udara (PRSA)")
 st.markdown(f"Menampilkan analisis performa kualitas udara untuk **Stasiun {selected_station}** pada **Tahun {selected_year}**.")
+st.markdown("---")
 
-# 4. METRICS
+
+# 4. METRICS (Ringkasan Angka Utama)
 st.subheader("📊 Ringkasan Parameter Utama")
 col1, col2, col3 = st.columns(3)
 
@@ -50,9 +70,11 @@ with col3:
 
 st.markdown("---")
 
-# 5. VISUALISASI 1
+
+# 5. VISUALISASI 1: TREN BULANAN PM2.5 (Menjawab Pertanyaan 1)
 st.subheader("📈 Tren Bulanan Konsentrasi PM2.5")
 monthly_pm25 = filtered_df.groupby('month')['PM2.5'].mean().reset_index()
+
 fig, ax = plt.subplots(figsize=(10, 4))
 sns.lineplot(data=monthly_pm25, x='month', y='PM2.5', marker='o', color='darkred', linewidth=2.5, ax=ax)
 ax.set_xlabel("Bulan")
@@ -60,7 +82,8 @@ ax.set_ylabel("Rata-Rata PM2.5 (µg/m³)")
 ax.set_xticks(range(1, 13))
 st.pyplot(fig)
 
-# 6. VISUALISASI 2
+
+# 6. VISUALISASI 2: SCATTER PLOT TEMP VS SO2 (Menjawab Pertanyaan 2)
 st.subheader("☀️ Hubungan Suhu Udara (TEMP) vs Kadar SO2")
 fig2, ax2 = plt.subplots(figsize=(10, 5))
 sns.regplot(data=filtered_df, x='TEMP', y='SO2', 
@@ -70,10 +93,13 @@ ax2.set_xlabel("Suhu Udara (TEMP dalam °C)")
 ax2.set_ylabel("Kadar Sulfur Dioksida (SO2)")
 st.pyplot(fig2)
 
-# 7. VISUALISASI 3
+
+# 7. VISUALISASI 3: PERINGKAT POLUSI ANTAR STASIUN (Menjawab Pertanyaan 3)
 st.subheader("🏢 Perbandingan Rata-Rata PM2.5 Seluruh Stasiun")
+# Mengambil data perbandingan seluruh stasiun pada tahun yang dipilih
 station_ranking = df[df['year'] == selected_year].groupby('station')['PM2.5'].mean().reset_index()
 station_ranking = station_ranking.sort_values(by='PM2.5', ascending=False)
+
 fig3, ax3 = plt.subplots(figsize=(12, 5))
 sns.barplot(data=station_ranking, x='station', y='PM2.5', palette='Reds_r', ax=ax3)
 ax3.set_xlabel("Stasiun")
@@ -81,4 +107,5 @@ ax3.set_ylabel("Rata-Rata PM2.5 (µg/m³)")
 plt.xticks(rotation=45)
 st.pyplot(fig3)
 
+st.markdown("---")
 st.caption("Copyright © Proyek Analisis Data Dicoding")
