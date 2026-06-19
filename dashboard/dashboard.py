@@ -9,8 +9,8 @@ sns.set_theme(style="whitegrid")
 # 1. LOAD DATA
 @st.cache_data
 def load_data():
-    # Membaca file main_data.csv yang ada di folder Colab kamu
-    data = pd.read_csv("main_data.csv")
+    # Membaca file main_data.csv yang ada di folder Colab kamu yg Mengarah langsung ke file ZIP di dalam folder dashboard GitHub
+    data = pd.read_csv("main_data.zip")
     data['datetime'] = pd.to_datetime(data['year'].astype(str) + '-' + 
                                        data['month'].astype(str).str.zfill(2) + '-' + 
                                        data['day'].astype(str).str.zfill(2))
